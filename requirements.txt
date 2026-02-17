@@ -1,5 +1,4 @@
 streamlit
 anthropic
-newspaper3k
 PyPDF2
-lxml_html_clean
+pandas
