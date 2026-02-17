@@ -1,6 +1,5 @@
 import streamlit as st
 import anthropic
-from newspaper import Article
 import PyPDF2
 import pandas as pd
 import io
@@ -10,15 +9,9 @@ from datetime import date
 # --- APP CONFIG ---
 st.set_page_config(page_title="Wintel: Team Intel", page_icon="🚀", layout="wide")
 
-# --- CRASH PROTECTION: DATABASE LOGIC ---
-# This ensures the app doesn't break if the file is missing
+# --- DATABASE LOGIC ---
 if 'prospect_db' not in st.session_state:
-    try:
-        # Try to load existing data if you ever add a CSV to GitHub
-        st.session_state['prospect_db'] = pd.read_csv('prospect_pool.csv')
-    except:
-        # If no file exists, start with a clean slate
-        st.session_state['prospect_db'] = pd.DataFrame(columns=['Date','University','Role','Priority','Status'])
+    st.session_state['prospect_db'] = pd.DataFrame(columns=['Date','University','Role','Priority','Status'])
 
 # Custom CSS
 st.markdown("""
@@ -44,12 +37,11 @@ with st.sidebar:
     
     st.markdown("---")
     st.header("📧 Email Guesser")
-    with st.expander("Format Finder"):
-        fn = st.text_input("First Name")
-        ln = st.text_input("Last Name")
-        dom = st.text_input("Domain (e.g. bu.edu)")
-        if fn and ln and dom:
-            st.code(f"{fn}.{ln}@{dom}")
+    fn = st.text_input("First Name")
+    ln = st.text_input("Last Name")
+    dom = st.text_input("Domain (e.g. bu.edu)")
+    if fn and ln and dom:
+        st.code(f"{fn}.{ln}@{dom}")
 
 # --- MAIN INTERFACE: TABS ---
 tab_research, tab_pool = st.tabs(["🎯 New Research", "📊 Team Prospect Pool"])
@@ -59,8 +51,6 @@ with tab_research:
     with col1: university = st.text_input("University Name")
     with col2: target_role = st.text_input("Target Role", value="Director of Counseling")
     
-    st.markdown("---")
-    # QUICK RECON LINKS
     if university:
         st.markdown("### 🕵️‍♂️ Quick Recon")
         c1, c2, c3 = st.columns(3)
@@ -69,22 +59,15 @@ with tab_research:
         with c3: st.link_button("👥 Directory", f"https://www.google.com/search?q={urllib.parse.quote(university + ' counseling staff directory')}")
 
     st.markdown("---")
-    t1, t2 = st.tabs(["Link Scraper", "PDF Upload"])
-    with t1: url = st.text_input("Paste Research Link")
-    with t2: uploaded_file = st.file_uploader("Upload PDF", type="pdf")
+    uploaded_file = st.file_uploader("Upload Strategic Plan or Research (PDF)", type="pdf")
 
     if st.button("Generate & Log Strategy"):
         research_text = ""
-        if url:
-            try:
-                article = Article(url); article.download(); article.parse()
-                research_text = article.text[:4000]
-            except: st.error("Link error.")
-        elif uploaded_file:
+        if uploaded_file:
             try:
                 reader = PyPDF2.PdfReader(uploaded_file)
                 for page in reader.pages: research_text += page.extract_text()
-                research_text = research_text[:4000]
+                research_text = research_text[:6000] # Increased limit for better AI context
             except: st.error("PDF error.")
 
         if research_text and api_key:
@@ -99,11 +82,11 @@ with tab_research:
                 st.session_state['prospect_db'] = pd.concat([st.session_state['prospect_db'], new_entry], ignore_index=True)
                 
                 st.markdown(f'<div class="card">{output}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("Please upload a PDF and ensure your API key is active.")
 
 with tab_pool:
     st.subheader("📁 Saved Prospect Pool")
     st.dataframe(st.session_state['prospect_db'], use_container_layout=True)
-    
-    # Export Button
     csv = st.session_state['prospect_db'].to_csv(index=False).encode('utf-8')
     st.download_button("📥 Export to CSV", csv, "prospect_pool.csv", "text/csv")
