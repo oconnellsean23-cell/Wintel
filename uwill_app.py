@@ -115,47 +115,80 @@ with tab_news:
     st.subheader("📰 Territory News Scraper")
     st.write("Scrape the latest student wellness and mental health initiatives by school.")
 
-    # Using unique keys so these don't conflict with your tab_research inputs
-    target_school = st.text_input("Target School (e.g., Boston College)", key="news_target_school")
+    # 1. Swapped to text_area so you can paste a list
+    schools_input = st.text_area(
+        "Target Schools (Paste a list, one school per line)", 
+        key="news_target_schools", 
+        height=150,
+        placeholder="Boston College\nAssumption University\nPingree School"
+    )
+    
     timeframe = st.selectbox("Timeframe:", ["1d", "7d", "30d"], key="news_timeframe")
 
-    if st.button("Search News", type="primary"):
-        if target_school:
-            with st.spinner(f"Scraping the web for {target_school}..."):
+    if st.button("Search Territory", type="primary"):
+        # Convert the pasted text into a clean Python list
+        schools_list = [school.strip() for school in schools_input.split('\n') if school.strip()]
+        
+        if schools_list:
+            # We need a master list to hold the articles from all schools
+            master_news_list = []
+            
+            # Setup a visual progress bar so the team knows it's working
+            progress_bar = st.progress(0, text="Starting search...")
+            
+            google_news = GNews(language='en', country='US', period=timeframe, max_results=5)
+            
+            # The exact keywords we demand to see
+            keywords = ["mental health", "wellness", "counseling", "teletherapy", "therapy", "well-being", "psychiatric"]
+            
+            for index, school in enumerate(schools_list):
+                # Update the progress bar for each school
+                progress_percentage = (index + 1) / len(schools_list)
+                progress_bar.progress(progress_percentage, text=f"Scraping {school}...")
                 
-                # Initialize GNews
-                google_news = GNews(language='en', country='US', period=timeframe, max_results=10)
+                # The broad Google search
+                keyword_string = " OR ".join([f'"{kw}"' for kw in ["mental health", "student wellness", "counseling"]])
+                query = f'"{school}" AND ({keyword_string})'
                 
-                # Construct the Boolean query specifically for your BDR use-case
-                keywords = ["mental health", "student wellness", "counseling", "teletherapy"]
-                keyword_string = " OR ".join([f'"{kw}"' for kw in keywords])
-                query = f'"{target_school}" AND ({keyword_string})'
-                
-                # Fetch the data
                 articles = google_news.get_news(query)
                 
                 if articles:
-                    st.success(f"Found {len(articles)} articles!")
-                    
-                    # Convert to a pandas DataFrame and clean it up
-                    df = pd.DataFrame(articles)
-                    df = df[['title', 'published date', 'url']]
-                    
-                    # Clean up the date format (optional but looks nicer)
-                    df['published date'] = pd.to_datetime(df['published date']).dt.strftime('%b %d, %Y')
-                    
-                    # Display as an interactive Streamlit dataframe
-                    st.dataframe(
-                        df,
-                        column_config={
-                            "title": "Article Title",
-                            "published date": "Date Published",
-                            "url": st.column_config.LinkColumn("Read Article")
-                        },
-                        hide_index=True,
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("No recent news found for those parameters. Try expanding the timeframe.")
+                    for article in articles:
+                        title_lower = article['title'].lower()
+                        
+                        # 2. THE DIALED-IN FILTER: Only keep it if a keyword is actually in the title
+                        if any(kw in title_lower for kw in keywords):
+                            # Tag the article with the school name so we know who it belongs to
+                            article['Target Account'] = school
+                            master_news_list.append(article)
+            
+            # Clear the progress bar when done
+            progress_bar.empty()
+            
+            # Display the final, filtered results
+            if master_news_list:
+                st.success(f"Found {len(master_news_list)} highly relevant articles across your territory!")
+                
+                df = pd.DataFrame(master_news_list)
+                
+                # Reorder and select columns (now including the Target Account)
+                df = df[['Target Account', 'title', 'published date', 'url']]
+                
+                # Clean up the date
+                df['published date'] = pd.to_datetime(df['published date']).dt.strftime('%b %d, %Y')
+                
+                st.dataframe(
+                    df,
+                    column_config={
+                        "Target Account": "School",
+                        "title": "Article Title",
+                        "published date": "Date Published",
+                        "url": st.column_config.LinkColumn("Read Article")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.warning("No highly relevant mental health news found for those schools in that timeframe.")
         else:
-            st.error("Please enter a school name first.")
+            st.error("Please paste at least one school name first.")
