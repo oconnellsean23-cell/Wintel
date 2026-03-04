@@ -4,7 +4,7 @@ import PyPDF2
 import pandas as pd
 import urllib.parse
 from datetime import date
-
+from gnews import GNews
 # --- 1. INITIAL APP SETUP ---
 st.set_page_config(page_title="Wintel: Team Intel", page_icon="🚀", layout="wide")
 
@@ -49,7 +49,7 @@ with st.sidebar:
         st.metric("Prospects Researched", len(st.session_state['prospect_db']))
 
 # --- 4. MAIN INTERFACE ---
-tab_research, tab_pool = st.tabs(["🎯 New Research", "📊 Team Prospect Pool"])
+tab_research, tab_pool, tab_news = st.tabs(["🎯 New Research", "📊 Team Prospect Pool", "📰 Territory News"])
 
 with tab_research:
     col1, col2 = st.columns(2)
@@ -110,3 +110,52 @@ with tab_pool:
         st.dataframe(st.session_state['prospect_db'], use_container_width=True)
         csv_data = st.session_state['prospect_db'].to_csv(index=False).encode('utf-8')
         st.download_button("📥 Export Pool to CSV", csv_data, "uwill_prospects.csv", "text/csv")
+# --- 5. TERRITORY NEWS SCRAPER ---
+with tab_news:
+    st.subheader("📰 Territory News Scraper")
+    st.write("Scrape the latest student wellness and mental health initiatives by school.")
+
+    # Using unique keys so these don't conflict with your tab_research inputs
+    target_school = st.text_input("Target School (e.g., Boston College)", key="news_target_school")
+    timeframe = st.selectbox("Timeframe:", ["1d", "7d", "30d"], key="news_timeframe")
+
+    if st.button("Search News", type="primary"):
+        if target_school:
+            with st.spinner(f"Scraping the web for {target_school}..."):
+                
+                # Initialize GNews
+                google_news = GNews(language='en', country='US', period=timeframe, max_results=10)
+                
+                # Construct the Boolean query specifically for your BDR use-case
+                keywords = ["mental health", "student wellness", "counseling", "teletherapy"]
+                keyword_string = " OR ".join([f'"{kw}"' for kw in keywords])
+                query = f'"{target_school}" AND ({keyword_string})'
+                
+                # Fetch the data
+                articles = google_news.get_news(query)
+                
+                if articles:
+                    st.success(f"Found {len(articles)} articles!")
+                    
+                    # Convert to a pandas DataFrame and clean it up
+                    df = pd.DataFrame(articles)
+                    df = df[['title', 'published date', 'url']]
+                    
+                    # Clean up the date format (optional but looks nicer)
+                    df['published date'] = pd.to_datetime(df['published date']).dt.strftime('%b %d, %Y')
+                    
+                    # Display as an interactive Streamlit dataframe
+                    st.dataframe(
+                        df,
+                        column_config={
+                            "title": "Article Title",
+                            "published date": "Date Published",
+                            "url": st.column_config.LinkColumn("Read Article")
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No recent news found for those parameters. Try expanding the timeframe.")
+        else:
+            st.error("Please enter a school name first.")
