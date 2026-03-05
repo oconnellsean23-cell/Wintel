@@ -1,6 +1,6 @@
 streamlit
+pandas
 anthropic
 PyPDF2
-pandas
 gnews
-requests
+beautifulsoup4
