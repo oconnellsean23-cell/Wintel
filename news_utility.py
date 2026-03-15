@@ -3,8 +3,9 @@ import urllib.parse
 import requests
 
 def get_google_news(school_name):
-    # Hunting for relevant institutional/student wellness news and filtering out sports
-    query = f'"{school_name}" AND ("wellness" OR "mental health" OR "administration" OR "partnership") -football -basketball -hockey'
+    # ADDED: -study -research -faculty -professor to eliminate academic papers
+    # ADDED: "counseling center" and "student affairs" for higher-intent administrative news
+    query = f'"{school_name}" AND ("counseling center" OR "student affairs" OR "mental health" OR "wellness") -sports -football -basketball -hockey -study -research -faculty -professor'
     encoded_query = urllib.parse.quote(query)
     url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
 
@@ -23,13 +24,13 @@ def get_google_news(school_name):
 
 def get_newsapi_articles(school_name, api_key):
     url = "https://newsapi.org/v2/everything"
-    # Similar query logic formatted for NewsAPI
-    query = f'"{school_name}" AND (wellness OR health OR administration OR student)'
+    query = f'"{school_name}" AND ("mental health" OR wellness OR counseling OR "student affairs")'
     
     params = {
         'q': query,
+        'searchIn': 'title,description', # <--- THE MAGIC FIX: Only searches headlines/summaries
         'language': 'en',
-        'sortBy': 'publishedAt', 
+        'sortBy': 'relevancy', # Changed from 'publishedAt' to prioritize exact matches
         'apiKey': api_key,
         'pageSize': 5 
     }
