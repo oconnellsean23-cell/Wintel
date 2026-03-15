@@ -3,9 +3,9 @@ import urllib.parse
 import requests
 
 def get_google_news(school_name):
-    # ADDED: -study -research -faculty -professor to eliminate academic papers
-    # ADDED: "counseling center" and "student affairs" for higher-intent administrative news
-    query = f'"{school_name}" AND ("counseling center" OR "student affairs" OR "mental health" OR "wellness") -sports -football -basketball -hockey -study -research -faculty -professor'
+    # THE FIX: Using intitle: forces the school name to be in the actual headline.
+    # We also stripped out the "AND" operators which Google RSS sometimes misinterprets.
+    query = f'intitle:"{school_name}" ("mental health" OR wellness OR counseling OR "student affairs" OR therapy)'
     encoded_query = urllib.parse.quote(query)
     url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
 
@@ -24,13 +24,13 @@ def get_google_news(school_name):
 
 def get_newsapi_articles(school_name, api_key):
     url = "https://newsapi.org/v2/everything"
-    query = f'"{school_name}" AND ("mental health" OR wellness OR counseling OR "student affairs")'
+    query = f'"{school_name}" AND ("mental health" OR wellness OR counseling OR "student affairs" OR therapy)'
     
     params = {
         'q': query,
-        'searchIn': 'title,description', # <--- THE MAGIC FIX: Only searches headlines/summaries
+        'searchIn': 'title,description', 
         'language': 'en',
-        'sortBy': 'relevancy', # Changed from 'publishedAt' to prioritize exact matches
+        'sortBy': 'relevancy', 
         'apiKey': api_key,
         'pageSize': 5 
     }
