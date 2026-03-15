@@ -9,6 +9,9 @@ import requests
 from bs4 import BeautifulSoup
 import time
 
+# --- NEW: Import our utility functions ---
+from news_utility import get_google_news, get_newsapi_articles
+
 # --- 1. INITIAL APP SETUP ---
 st.set_page_config(page_title="Wintel: Team Intel", page_icon="🚀", layout="wide")
 
@@ -130,9 +133,44 @@ with tab_pool:
         csv_data = export_df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Formatted CSV", csv_data, f"prospects_{export_format.lower().replace(' ', '_')}.csv", "text/csv")
 
-# --- TAB 3: TERRITORY INTEL & TRIGGERS (MAJOR UPGRADE) ---
+# --- TAB 3: TERRITORY INTEL & TRIGGERS (UPDATED WITH NEW ALERTS) ---
 with tab_news:
-    # STRATEGY 3: STATE MANDATE TRACKER
+    
+    # --- NEW: Automated Alert Tester Section ---
+    st.subheader("🔔 NEW: Automated Team Alert Tester")
+    st.write("Test the strict new Google RSS and NewsAPI feeds before we automate them for your team.")
+    
+    colA, colB = st.columns(2)
+    with colA: alert_school = st.text_input("Alert Target School:", "Boston University")
+    with colB: news_api_key_input = st.text_input("NewsAPI Key (for testing):", type="password")
+    
+    if st.button("Test Alert Feeds"):
+        st.markdown(f"**Latest updates for {alert_school}**")
+        
+        # Google News RSS
+        st.markdown("#### From Google News (Free/Real-time)")
+        google_results = get_google_news(alert_school)
+        if google_results:
+            for article in google_results:
+                st.write(f"- **[{article['title']}]({article['link']})**")
+        else:
+            st.write("No relevant Google News found.")
+            
+        # NewsAPI
+        st.markdown("#### From NewsAPI (Structured)")
+        if news_api_key_input:
+            newsapi_results = get_newsapi_articles(alert_school, news_api_key_input)
+            if newsapi_results:
+                for article in newsapi_results:
+                    st.write(f"- **[{article['title']}]({article['link']})** *(_{article['source']}_)*")
+            else:
+                st.write("No relevant NewsAPI articles found.")
+        else:
+            st.warning("Please enter a NewsAPI key to test this feed.")
+
+    st.markdown("---")
+
+    # --- EXISTING STRATEGY 3: STATE MANDATE TRACKER ---
     with st.expander("🏛️ Macro-Trend & State Mandate Tracker", expanded=False):
         st.write("Monitor states passing new legislation or budget mandates for student mental health.")
         state_input = st.text_input("Target State(s)", value="Massachusetts")
@@ -153,7 +191,6 @@ with tab_news:
     
     colA, colB = st.columns(2)
     with colA: search_type = st.radio("Intelligence Type:", ["General Wellness News", "Grant & Funding Announcements"])
-    # STRATEGY 1: AI TOGGLE
     with colB: use_ai = st.toggle("🤖 Enable AI 'So What?' Summaries (Takes longer)")
 
     if st.button("Run Territory Scan", type="primary"):
@@ -164,7 +201,6 @@ with tab_news:
             progress_bar = st.progress(0, text="Starting search...")
             google_news = GNews(language='en', country='US', period='7d', max_results=3)
             
-            # STRATEGY 2: COMPETITOR DICTIONARY
             competitors = ["timelycare", "mantra health", "talkspace", "betterhelp", "christie campus"]
             partner_keyword = "uwill"
             
@@ -184,14 +220,12 @@ with tab_news:
                         title_lower = article['title'].lower()
                         if any(kw in title_lower for kw in keywords):
                             
-                            # COMPETITOR LOGIC
                             vendor_status = "None Detected"
                             if any(comp in title_lower for comp in competitors):
                                 vendor_status = "🚨 COMPETITOR"
                             elif partner_keyword in title_lower:
                                 vendor_status = "✅ UWILL MENTION"
                                 
-                            # AI SUMMARY LOGIC
                             ai_pitch = "AI Disabled"
                             if use_ai:
                                 try:
@@ -222,7 +256,6 @@ with tab_news:
                 res_df = pd.DataFrame(master_news_list)
                 res_df['Published'] = pd.to_datetime(res_df['Published']).dt.strftime('%b %d')
                 
-                # Dynamic column display based on AI toggle
                 cols_to_show = ['Target Account', 'Vendor Signal', 'Title']
                 if use_ai: cols_to_show.append('AI Angle')
                 cols_to_show.extend(['Published', 'URL'])
